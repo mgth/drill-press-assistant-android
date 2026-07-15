@@ -58,7 +58,7 @@ private val ACCENT_SOFT = androidx.compose.ui.graphics.Color(0xFFFDE8CC)
 private val MUTED = androidx.compose.ui.graphics.Color(0xFF6B6B6B)
 private val BORDER = androidx.compose.ui.graphics.Color(0xFFD8D8D8)
 
-private fun fmtNum(v: Double): String =
+internal fun fmtNum(v: Double): String =
     if (v == floor(v)) v.toLong().toString() else (Math.round(v * 100) / 100.0).toString().replace(".", ",")
 
 private fun comboKey(pairs: List<Pair<Int, Int>>): String =
@@ -79,7 +79,7 @@ private fun rangeLabel(r: DiameterRange?): String {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DrillingScreen(machine: Machine) {
+fun DrillingScreen(machine: Machine, machineRev: Int) {
     var materialId by remember { mutableStateOf("steel") }
     var carbide by remember { mutableStateOf(false) }
     var vcOverride by remember { mutableStateOf<Double?>(null) }
@@ -100,7 +100,7 @@ fun DrillingScreen(machine: Machine) {
     // Tout changement de paramètre réinitialise la sélection manuelle.
     LaunchedEffect(materialId, carbide, vcOverride, diameterMm) { selectedKey = null }
 
-    val reco = remember(materialId, carbide, vcOverride, diameterMm, machine) {
+    val reco = remember(materialId, carbide, vcOverride, diameterMm, machineRev) {
         if (diameterMm > 0 && vc > 0) recommend(machine, vc, diameterMm) else null
     }
     val ranges = remember(reco) { reco?.let { diameterRanges(it.all, vc) } }

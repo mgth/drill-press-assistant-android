@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
@@ -15,6 +14,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -28,15 +28,16 @@ enum class AppTab(val label: String) {
 }
 
 /**
- * Squelette de navigation à deux onglets, calqué sur la version web.
- * La machine (une seule par défaut pour l'instant) est partagée entre onglets ;
- * l'éditeur de machine viendra remplacer le placeholder de l'onglet Machine.
+ * Navigation à deux onglets. La machine (une seule pour l'instant) est mutable
+ * — portée 1:1 du TS —, donc un compteur de révision `machineRev` force la
+ * recomposition des deux onglets à chaque édition.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun App() {
-    var tab by remember { mutableStateOf(AppTab.DRILLING) }
+    var tab by remember { mutableStateOf(AppTab.MACHINE) }
     val machine = remember { createThreeShaftMachine() }
+    var machineRev by remember { mutableIntStateOf(0) }
 
     Scaffold(
         topBar = {
@@ -59,19 +60,9 @@ fun App() {
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             when (tab) {
-                AppTab.MACHINE -> MachineTab()
-                AppTab.DRILLING -> DrillingScreen(machine)
+                AppTab.MACHINE -> MachineScreen(machine, machineRev) { machineRev++ }
+                AppTab.DRILLING -> DrillingScreen(machine, machineRev)
             }
         }
     }
-}
-
-@Composable
-private fun MachineTab() {
-    Text("Éditeur de machine", style = MaterialTheme.typography.titleMedium)
-    Text(
-        "À porter : nom, vitesse moteur, arbres et cônes étagés, positions de " +
-            "courroie, cône unique, option miroir.",
-        style = MaterialTheme.typography.bodyMedium,
-    )
 }
