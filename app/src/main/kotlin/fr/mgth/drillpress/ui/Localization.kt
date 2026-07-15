@@ -1,5 +1,7 @@
 package fr.mgth.drillpress.ui
 
+import fr.mgth.drillpress.core.DEFAULT_FACTORY_LABELS
+import fr.mgth.drillpress.core.FactoryLabels
 import fr.mgth.drillpress.core.Issue
 import fr.mgth.drillpress.core.IssueCode
 import fr.mgth.drillpress.core.MM_PER_INCH
@@ -15,6 +17,12 @@ enum class Units(val code: String) { METRIC("mm"), IMPERIAL("in") }
 class Strings(
     val tabMachine: String,
     val tabDrilling: String,
+    // Picker
+    val pickerMachine: String,
+    val newTwoShaft: String,
+    val newThreeShaft: String,
+    val deleteMachine: String,
+    val deleteConfirm: String,
     // Machine
     val name: String,
     val motorRpm: String,
@@ -51,6 +59,8 @@ class Strings(
 
 val FR = Strings(
     tabMachine = "Machine", tabDrilling = "Perçage",
+    pickerMachine = "Machine", newTwoShaft = "Nouvelle (2 arbres)", newThreeShaft = "Nouvelle (3 arbres)",
+    deleteMachine = "Supprimer", deleteConfirm = "Supprimer cette machine ?",
     name = "Nom", motorRpm = "Vitesse moteur (tr/min)",
     spindleLeft = "Broche à gauche sur le schéma",
     sharedCone = "Cône unique (entrée et sortie sur le même cône)",
@@ -81,6 +91,8 @@ val FR = Strings(
 
 val EN = Strings(
     tabMachine = "Machine", tabDrilling = "Drilling",
+    pickerMachine = "Machine", newTwoShaft = "New (2 shafts)", newThreeShaft = "New (3 shafts)",
+    deleteMachine = "Delete", deleteConfirm = "Delete this machine?",
     name = "Name", motorRpm = "Motor speed (rpm)",
     spindleLeft = "Spindle on the left of the diagram",
     sharedCone = "Single cone (input and output on the same cone)",
@@ -138,3 +150,12 @@ fun formatVc(mPerMin: Double, u: Units, lang: Lang): String =
 
 fun materialLabel(m: Material, lang: Lang) = if (lang == Lang.EN) m.labelEn else m.labelFr
 fun materialAbbr(m: Material, lang: Lang) = if (lang == Lang.EN) m.abbrEn else m.abbrFr
+
+/** Libellés des gabarits de machine selon la langue. */
+fun factoryLabels(lang: Lang): FactoryLabels =
+    if (lang == Lang.EN) FactoryLabels(
+        twoShaftName = "2-shaft drill press", threeShaftName = "3-shaft drill press",
+        motorShaft = "Motor", intermediateShaft = "Intermediate", spindleShaft = "Spindle",
+        motorCone = "Motor cone", spindleCone = "Spindle cone", intermediateCone = "Intermediate cone",
+        intermediateConeIn = "Intermediate cone (input)", intermediateConeOut = "Intermediate cone (output)",
+    ) else DEFAULT_FACTORY_LABELS

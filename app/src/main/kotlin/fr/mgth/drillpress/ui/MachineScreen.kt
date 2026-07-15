@@ -7,10 +7,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
@@ -48,10 +50,12 @@ fun MachineScreen(app: AppState) {
     ensurePairNames(machine)
     val issues = validateMachine(machine)
 
+    MachinePicker(app)
+
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            LocalTextField(machine.name, t.name, Unit, Modifier.fillMaxWidth()) { machine.name = it; app.touch() }
-            LocalNumberField(machine.motorRpm, t.motorRpm, Unit, Modifier.width(220.dp)) { machine.motorRpm = it; app.touch() }
+            LocalTextField(machine.name, t.name, machine.id, Modifier.fillMaxWidth()) { machine.name = it; app.touch() }
+            LocalNumberField(machine.motorRpm, t.motorRpm, machine.id, Modifier.width(220.dp)) { machine.motorRpm = it; app.touch() }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Switch(checked = machine.spindleLeft, onCheckedChange = { machine.spindleLeft = it; app.touch() })
                 Text(t.spindleLeft, style = MaterialTheme.typography.bodyMedium)
@@ -77,6 +81,43 @@ fun MachineScreen(app: AppState) {
     order.forEach { s -> ShaftCard(app, s) }
 
     machine.belts.forEachIndexed { k, belt -> BeltEditor(app, belt, k) }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun MachinePicker(app: AppState) {
+    val t = app.t
+    var confirmDelete by remember { mutableStateOf(false) }
+
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        var expanded by remember { mutableStateOf(false) }
+        ExposedDropdownMenuBox(expanded, { expanded = it }, Modifier.weight(1f)) {
+            OutlinedTextField(
+                value = app.machine.name, onValueChange = {}, readOnly = true, label = { Text(t.pickerMachine) },
+                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                modifier = Modifier.menuAnchor().fillMaxWidth(),
+            )
+            ExposedDropdownMenu(expanded, { expanded = false }) {
+                app.machines.forEach { m ->
+                    DropdownMenuItem(text = { Text(m.name) }, onClick = { app.selectMachine(m.id); expanded = false })
+                }
+            }
+        }
+        if (app.machines.size > 1) TextButton(onClick = { confirmDelete = true }) { Text(t.deleteMachine) }
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        TextButton(onClick = { app.addTwoShaft() }) { Text(t.newTwoShaft) }
+        TextButton(onClick = { app.addThreeShaft() }) { Text(t.newThreeShaft) }
+    }
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            confirmButton = { TextButton(onClick = { app.removeMachine(app.currentId); confirmDelete = false }) { Text(t.deleteMachine) } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("×") } },
+            text = { Text(t.deleteConfirm) },
+        )
+    }
 }
 
 @Composable

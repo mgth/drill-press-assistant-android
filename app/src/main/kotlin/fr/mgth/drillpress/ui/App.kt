@@ -29,14 +29,16 @@ enum class AppTab { MACHINE, DRILLING }
 @Composable
 fun App() {
     val ctx = LocalContext.current
-    val app = remember { AppState().also { loadState(ctx, it) } }
+    val app = remember { AppState().also { loadState(ctx, it); it.ensureMachine() } }
     var tab by remember { mutableStateOf(AppTab.MACHINE) }
     val t = app.t
 
-    // Sauvegarde à chaque changement d'état persistant.
-    LaunchedEffect(app.rev, app.materialId, app.carbide, app.vcOverride, app.diameterMm, app.lang, app.units) {
-        saveState(ctx, app)
-    }
+    // Sauvegarde à chaque changement d'état persistant (édition, ajout/suppression
+    // ou changement de machine courante, réglages, langue, unités).
+    LaunchedEffect(
+        app.rev, app.machines.size, app.currentId,
+        app.materialId, app.carbide, app.vcOverride, app.diameterMm, app.lang, app.units,
+    ) { saveState(ctx, app) }
 
     Scaffold(
         topBar = {

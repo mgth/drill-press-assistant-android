@@ -16,7 +16,7 @@ import org.json.JSONObject
  */
 private const val PREFS = "drill_press_state"
 private const val KEY = "state"
-private const val VERSION = 1
+private const val VERSION = 2
 
 private fun machineToJson(m: Machine): JSONObject = JSONObject().apply {
     put("id", m.id)
@@ -82,7 +82,8 @@ private fun machineFromJson(o: JSONObject): Machine {
 fun saveState(context: Context, app: AppState) {
     val json = JSONObject().apply {
         put("version", VERSION)
-        put("machine", machineToJson(app.machine))
+        put("machines", JSONArray(app.machines.map { machineToJson(it) }))
+        put("currentId", app.currentId)
         put("advisor", JSONObject().apply {
             put("materialId", app.materialId)
             put("carbide", app.carbide)
@@ -100,7 +101,10 @@ fun loadState(context: Context, app: AppState) {
     val o = runCatching { JSONObject(raw) }.getOrNull() ?: return
     if (o.optInt("version") != VERSION) return
     runCatching {
-        app.machine = machineFromJson(o.getJSONObject("machine"))
+        val arr = o.getJSONArray("machines")
+        app.machines.clear()
+        for (i in 0 until arr.length()) app.machines.add(machineFromJson(arr.getJSONObject(i)))
+        app.currentId = o.optString("currentId", app.machines.firstOrNull()?.id ?: "")
         o.optJSONObject("advisor")?.let { a ->
             app.materialId = a.optString("materialId", "steel")
             app.carbide = a.optBoolean("carbide", false)

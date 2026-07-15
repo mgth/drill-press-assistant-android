@@ -14,7 +14,7 @@ Native Android (Kotlin + Jetpack Compose) port of the Tauri/Svelte
 | Module | Contenu | État |
 |---|---|---|
 | `:core` | Moteur de calcul pur (machine, combinaisons, recommandation, plages Ø, unités) | ✅ porté, **30 tests JUnit verts** |
-| `:app` | Interface Jetpack Compose | ✅ fonctionnelle — schéma Canvas, 2 onglets, conseiller + table, éditeur de machine, **i18n fr/en**, **unités métrique/impérial**, **persistance** ; reste : machines multiples, quelques finitions |
+| `:app` | Interface Jetpack Compose | ✅ complète — schéma Canvas, 2 onglets, conseiller + table, éditeur de machine, **machines multiples** (créer/choisir/supprimer), i18n fr/en, unités métrique/impérial, persistance |
 
 Le moteur `:core` est un module Kotlin/JVM sans dépendance Android : il se teste
 sur PC (`./gradlew :core:test`) et produit des résultats identiques à la version
