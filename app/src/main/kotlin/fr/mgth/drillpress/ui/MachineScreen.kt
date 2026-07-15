@@ -1,8 +1,6 @@
 package fr.mgth.drillpress.ui
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,10 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import fr.mgth.drillpress.core.Belt
-import fr.mgth.drillpress.core.Issue
-import fr.mgth.drillpress.core.IssueCode
 import fr.mgth.drillpress.core.IssueLevel
-import fr.mgth.drillpress.core.Machine
 import fr.mgth.drillpress.core.PulleyStack
 import fr.mgth.drillpress.core.defaultPairNames
 import fr.mgth.drillpress.core.defaultPairs
@@ -44,42 +39,22 @@ import fr.mgth.drillpress.core.setSharedIntermediate
 import fr.mgth.drillpress.core.syncBeltPairs
 import fr.mgth.drillpress.core.validateMachine
 
-private fun issueMessage(i: Issue): String {
-    val p = i.params
-    return when (i.code) {
-        IssueCode.MOTOR_RPM -> "La vitesse moteur doit être supérieure à 0."
-        IssueCode.MIN_SHAFTS -> "Il faut au moins deux arbres (moteur et broche)."
-        IssueCode.BELT_COUNT -> "Il faut exactement une courroie entre chaque paire d'arbres consécutifs."
-        IssueCode.EMPTY_STACK -> "« ${p["stack"]} » (${p["shaft"]}) n'a aucun étage."
-        IssueCode.BAD_DIAMETER -> "« ${p["stack"]} » (${p["shaft"]}) a un diamètre invalide (doit être > 0)."
-        IssueCode.BELT_CHAIN -> "Courroie ${p["belt"]} : doit relier l'arbre ${p["from"]} à l'arbre ${p["to"]}."
-        IssueCode.STACK_MISSING -> "Courroie ${p["belt"]} : cône introuvable."
-        IssueCode.NO_PAIRS -> "Courroie ${p["belt"]} : aucune position définie."
-        IssueCode.PAIR_OUT_OF_RANGE -> "Courroie ${p["belt"]} : position (${p["i"]}, ${p["j"]}) hors limites."
-        IssueCode.DIAMETER_SUM -> "Courroie ${p["belt"]} : la somme des diamètres varie de plus de ${p["tolerance"]} % " +
-            "entre positions — vérifiez la saisie (sur de vrais cônes étagés elle est quasi constante)."
-        IssueCode.NO_COMBINATION -> "Aucune combinaison possible : sur un cône partagé, les deux courroies " +
-            "ne peuvent pas occuper le même étage."
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MachineScreen(machine: Machine, machineRev: Int, onChanged: () -> Unit) {
-    @Suppress("UNUSED_EXPRESSION") machineRev // relire pour recomposer à chaque édition
+fun MachineScreen(app: AppState) {
+    @Suppress("UNUSED_EXPRESSION") app.rev // relire pour recomposer à chaque édition
+    val machine = app.machine
+    val t = app.t
     ensurePairNames(machine)
     val issues = validateMachine(machine)
 
-    // Général
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            LocalTextField(machine.name, "Nom", Modifier.fillMaxWidth()) { machine.name = it; onChanged() }
-            LocalNumberField(machine.motorRpm, "Vitesse moteur (tr/min)", Modifier.width(220.dp)) {
-                machine.motorRpm = it; onChanged()
-            }
+            LocalTextField(machine.name, t.name, Unit, Modifier.fillMaxWidth()) { machine.name = it; app.touch() }
+            LocalNumberField(machine.motorRpm, t.motorRpm, Unit, Modifier.width(220.dp)) { machine.motorRpm = it; app.touch() }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Switch(checked = machine.spindleLeft, onCheckedChange = { machine.spindleLeft = it; onChanged() })
-                Text("Broche à gauche sur le schéma", style = MaterialTheme.typography.bodyMedium)
+                Switch(checked = machine.spindleLeft, onCheckedChange = { machine.spindleLeft = it; app.touch() })
+                Text(t.spindleLeft, style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
@@ -89,7 +64,7 @@ fun MachineScreen(machine: Machine, machineRev: Int, onChanged: () -> Unit) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 issues.forEach {
                     Text(
-                        issueMessage(it),
+                        t.issue(it),
                         color = if (it.level == IssueLevel.ERROR) Color(0xFFC0392B) else Color(0xFFB45309),
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -98,17 +73,15 @@ fun MachineScreen(machine: Machine, machineRev: Int, onChanged: () -> Unit) {
         }
     }
 
-    // Arbres, dans l'ordre d'affichage du schéma
-    val order = if (machine.spindleLeft) machine.shafts.indices.reversed().toList()
-    else machine.shafts.indices.toList()
-    order.forEach { s -> ShaftCard(machine, s, onChanged) }
+    val order = if (machine.spindleLeft) machine.shafts.indices.reversed().toList() else machine.shafts.indices.toList()
+    order.forEach { s -> ShaftCard(app, s) }
 
-    // Courroies
-    machine.belts.forEachIndexed { k, belt -> BeltEditor(machine, belt, k, onChanged) }
+    machine.belts.forEachIndexed { k, belt -> BeltEditor(app, belt, k) }
 }
 
 @Composable
-private fun ShaftCard(machine: Machine, s: Int, onChanged: () -> Unit) {
+private fun ShaftCard(app: AppState, s: Int) {
+    val machine = app.machine
     val shaft = machine.shafts[s]
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -117,66 +90,67 @@ private fun ShaftCard(machine: Machine, s: Int, onChanged: () -> Unit) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Switch(
                         checked = isSharedIntermediate(machine, s),
-                        onCheckedChange = { setSharedIntermediate(machine, s, it); onChanged() },
+                        onCheckedChange = { setSharedIntermediate(machine, s, it); app.touch() },
                     )
-                    Text("Cône unique (entrée et sortie sur le même cône)", style = MaterialTheme.typography.bodySmall)
+                    Text(app.t.sharedCone, style = MaterialTheme.typography.bodySmall)
                 }
             }
-            shaft.stacks.forEach { stack -> StackEditor(machine, stack, onChanged) }
+            shaft.stacks.forEach { stack -> StackEditor(app, stack) }
         }
     }
 }
 
 @Composable
-private fun StackEditor(machine: Machine, stack: PulleyStack, onChanged: () -> Unit) {
+private fun StackEditor(app: AppState, stack: PulleyStack) {
+    val t = app.t
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(stack.label, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
         stack.steps.forEachIndexed { i, d ->
             key(stack.id, i) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Ét. ${i + 1}", color = Color(0xFF6B6B6B), modifier = Modifier.width(40.dp))
-                    LocalNumberField(d, "Ø mm", Modifier.width(120.dp)) {
-                        stack.steps[i] = it; onChanged()
+                    Text("${t.step} ${i + 1}", color = Color(0xFF6B6B6B), modifier = Modifier.width(40.dp))
+                    LocalNumberField(displayLen(d, app.units), "Ø ${lenUnit(app.units)}", app.units, Modifier.width(130.dp)) {
+                        stack.steps[i] = parseLen(it, app.units); app.touch()
                     }
                     TextButton(
-                        onClick = { stack.steps.removeAt(i); syncBeltPairs(machine); onChanged() },
+                        onClick = { stack.steps.removeAt(i); syncBeltPairs(app.machine); app.touch() },
                         enabled = stack.steps.size > 1,
                     ) { Text("✕") }
                 }
             }
         }
         TextButton(onClick = {
-            stack.steps.add(stack.steps.lastOrNull() ?: 60.0); syncBeltPairs(machine); onChanged()
-        }) { Text("Ajouter un étage") }
+            stack.steps.add(stack.steps.lastOrNull() ?: 60.0); syncBeltPairs(app.machine); app.touch()
+        }) { Text(t.addStep) }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun BeltEditor(machine: Machine, belt: Belt, k: Int, onChanged: () -> Unit) {
+private fun BeltEditor(app: AppState, belt: Belt, k: Int) {
+    val machine = app.machine
+    val t = app.t
     val fromStack = machine.shafts[belt.fromShaft].stacks[belt.fromStack]
     val toStack = machine.shafts[belt.toShaft].stacks[belt.toStack]
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("Courroie ${k + 1}", fontWeight = FontWeight.SemiBold)
+            Text("${t.belt} ${k + 1}", fontWeight = FontWeight.SemiBold)
             Text("${fromStack.label} → ${toStack.label}", color = Color(0xFF6B6B6B), style = MaterialTheme.typography.bodySmall)
             belt.allowedPairs.forEachIndexed { i, pair ->
                 key(k, i) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        LocalTextField(
-                            belt.pairNames?.getOrNull(i) ?: "${i + 1}", "Rep.", Modifier.width(64.dp),
-                        ) { belt.pairNames?.set(i, it); onChanged() }
-                        StepDropdown(fromStack, pair.first, Modifier.weight(1f)) {
-                            belt.allowedPairs[i] = it to pair.second; onChanged()
+                        LocalTextField(belt.pairNames?.getOrNull(i) ?: "${i + 1}", t.pairRep, Unit, Modifier.width(64.dp)) {
+                            belt.pairNames?.set(i, it); app.touch()
+                        }
+                        StepDropdown(app, fromStack, pair.first, Modifier.weight(1f)) {
+                            belt.allowedPairs[i] = it to pair.second; app.touch()
                         }
                         Text("→")
-                        StepDropdown(toStack, pair.second, Modifier.weight(1f)) {
-                            belt.allowedPairs[i] = pair.first to it; onChanged()
+                        StepDropdown(app, toStack, pair.second, Modifier.weight(1f)) {
+                            belt.allowedPairs[i] = pair.first to it; app.touch()
                         }
                         TextButton(
-                            onClick = {
-                                belt.allowedPairs.removeAt(i); belt.pairNames?.removeAt(i); onChanged()
-                            },
+                            onClick = { belt.allowedPairs.removeAt(i); belt.pairNames?.removeAt(i); app.touch() },
                             enabled = belt.allowedPairs.size > 1,
                         ) { Text("✕") }
                     }
@@ -186,14 +160,14 @@ private fun BeltEditor(machine: Machine, belt: Belt, k: Int, onChanged: () -> Un
                 TextButton(onClick = {
                     belt.allowedPairs.add(0 to 0)
                     belt.pairNames?.add(defaultPairNames(k, belt.allowedPairs.size).last())
-                    onChanged()
-                }) { Text("Ajouter une position") }
+                    app.touch()
+                }) { Text(t.addPair) }
                 if (fromStack.steps.size == toStack.steps.size) {
                     TextButton(onClick = {
                         belt.allowedPairs = defaultPairs(fromStack, toStack)
                         belt.pairNames = defaultPairNames(k, belt.allowedPairs.size)
-                        onChanged()
-                    }) { Text("Réinitialiser") }
+                        app.touch()
+                    }) { Text(t.resetPairs) }
                 }
             }
         }
@@ -202,52 +176,36 @@ private fun BeltEditor(machine: Machine, belt: Belt, k: Int, onChanged: () -> Un
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun StepDropdown(stack: PulleyStack, selected: Int, modifier: Modifier, onSelect: (Int) -> Unit) {
+private fun StepDropdown(app: AppState, stack: PulleyStack, selected: Int, modifier: Modifier, onSelect: (Int) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }, modifier = modifier) {
+    fun label(idx: Int) = "${app.t.step} ${idx + 1} · ${formatLen(stack.steps[idx], app.units, app.lang)} ${lenUnit(app.units)}"
+    ExposedDropdownMenuBox(expanded, { expanded = it }, modifier) {
         OutlinedTextField(
-            value = "Ét. ${selected + 1} · ${fmtNum(stack.steps[selected])} mm",
-            onValueChange = {},
-            readOnly = true,
+            value = label(selected), onValueChange = {}, readOnly = true,
             modifier = Modifier.menuAnchor().fillMaxWidth(),
         )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            stack.steps.forEachIndexed { idx, d ->
-                DropdownMenuItem(
-                    text = { Text("Ét. ${idx + 1} · ${fmtNum(d)} mm") },
-                    onClick = { onSelect(idx); expanded = false },
-                )
+        ExposedDropdownMenu(expanded, { expanded = false }) {
+            stack.steps.indices.forEach { idx ->
+                DropdownMenuItem(text = { Text(label(idx)) }, onClick = { onSelect(idx); expanded = false })
             }
         }
     }
 }
 
-/** Champ texte à état local (l'utilisateur tape librement ; poussé au modèle tel quel). */
 @Composable
-private fun LocalTextField(value: String, label: String, modifier: Modifier, onValue: (String) -> Unit) {
-    var text by remember { mutableStateOf(value) }
-    OutlinedTextField(
-        value = text,
-        onValueChange = { text = it; onValue(it) },
-        label = { Text(label) },
-        singleLine = true,
-        modifier = modifier,
-    )
+private fun LocalTextField(value: String, label: String, resetKey: Any?, modifier: Modifier, onValue: (String) -> Unit) {
+    var text by remember(resetKey) { mutableStateOf(value) }
+    OutlinedTextField(text, { text = it; onValue(it) }, label = { Text(label) }, singleLine = true, modifier = modifier)
 }
 
-/** Champ numérique à état local ; ne pousse au modèle que les valeurs > 0 valides. */
 @Composable
-private fun LocalNumberField(value: Double, label: String, modifier: Modifier, onValue: (Double) -> Unit) {
-    var text by remember { mutableStateOf(fmtNum(value)) }
+private fun LocalNumberField(value: Double, label: String, resetKey: Any?, modifier: Modifier, onValue: (Double) -> Unit) {
+    var text by remember(resetKey) { mutableStateOf(fmtNum(value)) }
     OutlinedTextField(
         value = text,
-        onValueChange = { s ->
-            text = s
-            s.replace(",", ".").toDoubleOrNull()?.let { if (it > 0) onValue(it) }
-        },
+        onValueChange = { s -> text = s; s.replace(",", ".").toDoubleOrNull()?.let { if (it > 0) onValue(it) } },
         label = { Text(label) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-        singleLine = true,
-        modifier = modifier,
+        singleLine = true, modifier = modifier,
     )
 }

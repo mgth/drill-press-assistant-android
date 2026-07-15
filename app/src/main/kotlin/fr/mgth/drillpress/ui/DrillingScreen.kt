@@ -8,13 +8,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenuItem
@@ -25,38 +24,37 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import fr.mgth.drillpress.core.CARBIDE_FACTOR
 import fr.mgth.drillpress.core.Combination
 import fr.mgth.drillpress.core.DiameterRange
+import fr.mgth.drillpress.core.IMPERIAL_DRILLS
 import fr.mgth.drillpress.core.MATERIALS
 import fr.mgth.drillpress.core.Machine
-import fr.mgth.drillpress.core.createThreeShaftMachine
 import fr.mgth.drillpress.core.diameterRanges
 import fr.mgth.drillpress.core.formatDeviation
-import fr.mgth.drillpress.core.materialById
 import fr.mgth.drillpress.core.pairName
 import fr.mgth.drillpress.core.recommend
 import fr.mgth.drillpress.core.vcChipValues
 import fr.mgth.drillpress.core.vcMaterial
+import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.roundToInt
 
-private val ACCENT = androidx.compose.ui.graphics.Color(0xFFD97706)
-private val ACCENT_SOFT = androidx.compose.ui.graphics.Color(0xFFFDE8CC)
-private val MUTED = androidx.compose.ui.graphics.Color(0xFF6B6B6B)
-private val BORDER = androidx.compose.ui.graphics.Color(0xFFD8D8D8)
+private val ACCENT = Color(0xFFD97706)
+private val ACCENT_SOFT = Color(0xFFFDE8CC)
+private val MUTED = Color(0xFF6B6B6B)
+private val BORDER = Color(0xFFD8D8D8)
 
 internal fun fmtNum(v: Double): String =
     if (v == floor(v)) v.toLong().toString() else (Math.round(v * 100) / 100.0).toString().replace(".", ",")
@@ -64,156 +62,124 @@ internal fun fmtNum(v: Double): String =
 private fun comboKey(pairs: List<Pair<Int, Int>>): String =
     pairs.joinToString(";") { "${it.first},${it.second}" }
 
-private fun rangeLabel(r: DiameterRange?): String {
+private fun rangeLabel(r: DiameterRange?, units: Units, lang: Lang, all: String): String {
     if (r == null) return "—"
     val min = r.min
     val max = r.max
-    val f = { d: Double -> fmtNum(if (d >= 10) Math.round(d * 10) / 10.0 else Math.round(d * 100) / 100.0) }
+    val f = { d: Double -> formatLen(d, units, lang) }
     return when {
-        min == null && max == null -> "tous"
+        min == null && max == null -> all
         max == null -> "≥ ${f(min!!)}"
         min == null -> "≤ ${f(max)}"
         else -> "${f(min)} – ${f(max)}"
     }
 }
 
+private data class Chip(val label: String, val sub: String?, val active: Boolean, val onClick: () -> Unit)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DrillingScreen(machine: Machine, machineRev: Int) {
-    var materialId by remember { mutableStateOf("steel") }
-    var carbide by remember { mutableStateOf(false) }
-    var vcOverride by remember { mutableStateOf<Double?>(null) }
-    var diameterMm by remember { mutableStateOf(8.0) }
-    var selectedKey by remember { mutableStateOf<String?>(null) }
+fun DrillingScreen(app: AppState) {
+    val t = app.t
+    val machine = app.machine
 
-    val custom = vcOverride != null
-    val material = materialById(materialId)!!
-    val vc = vcOverride ?: material.vcHss * (if (carbide) CARBIDE_FACTOR else 1.0)
-
-    fun setMaterial(id: String) { materialId = id; vcOverride = null }
-    fun setCarbide(c: Boolean) { carbide = c; vcOverride = null }
-    fun setVc(v: Double) {
-        val m = vcMaterial(v, carbide)
-        if (m != null) { materialId = m.id; vcOverride = null } else vcOverride = v
+    val reco = remember(app.materialId, app.carbide, app.vcOverride, app.diameterMm, app.rev) {
+        if (app.diameterMm > 0 && app.vc > 0) recommend(machine, app.vc, app.diameterMm) else null
     }
+    val ranges = remember(reco) { reco?.let { diameterRanges(it.all, app.vc) } }
+    val displayed = reco?.let { r -> r.all.firstOrNull { comboKey(it.pairs) == app.selectedKey } ?: r.best }
 
-    // Tout changement de paramètre réinitialise la sélection manuelle.
-    LaunchedEffect(materialId, carbide, vcOverride, diameterMm) { selectedKey = null }
-
-    val reco = remember(materialId, carbide, vcOverride, diameterMm, machineRev) {
-        if (diameterMm > 0 && vc > 0) recommend(machine, vc, diameterMm) else null
-    }
-    val ranges = remember(reco) { reco?.let { diameterRanges(it.all, vc) } }
-    val displayed = reco?.let { r -> r.all.firstOrNull { comboKey(it.pairs) == selectedKey } ?: r.best }
-
-    // ---- Formulaire ----
-    Text("Paramètres de perçage", style = MaterialTheme.typography.titleMedium)
+    Text(t.drillingParams, style = MaterialTheme.typography.titleMedium)
 
     // Matériau + type de foret
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Bottom) {
         var expanded by remember { mutableStateOf(false) }
-        ExposedDropdownMenuBox(
-            expanded = expanded,
-            onExpandedChange = { expanded = it },
-            modifier = Modifier.weight(1f),
-        ) {
+        ExposedDropdownMenuBox(expanded, { expanded = it }, Modifier.weight(1f)) {
             OutlinedTextField(
-                value = if (custom) "Personnalisé" else material.labelFr,
-                onValueChange = {},
-                readOnly = true,
-                label = { Text("Matériau") },
+                value = if (app.custom) t.custom else materialLabel(app.material, app.lang),
+                onValueChange = {}, readOnly = true, label = { Text(t.material) },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                 modifier = Modifier.menuAnchor().fillMaxWidth(),
             )
-            ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            ExposedDropdownMenu(expanded, { expanded = false }) {
                 MATERIALS.forEach { m ->
-                    DropdownMenuItem(
-                        text = { Text(m.labelFr) },
-                        onClick = { setMaterial(m.id); expanded = false },
-                    )
+                    DropdownMenuItem(text = { Text(materialLabel(m, app.lang)) },
+                        onClick = { app.chooseMaterial(m.id); expanded = false })
                 }
             }
         }
         Column {
-            Text("Type de foret", fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.height(4.dp))
+            Text(t.bitType, fontWeight = FontWeight.SemiBold)
             SegToggle(
-                options = listOf("HSS", "Carbure"),
-                selectedIndex = if (custom) -1 else if (carbide) 1 else 0,
-                onSelect = { setCarbide(it == 1) },
-            )
+                listOf(t.hss, t.carbide),
+                if (app.custom) -1 else if (app.carbide) 1 else 0,
+            ) { app.chooseCarbide(it == 1) }
         }
     }
 
-    // Frise vitesse de coupe
+    // Frise Vc
     ChipStrip(
-        label = "Vitesse de coupe (m/min)",
-        values = vcChipValues(carbide).map { it to (vcMaterial(it, carbide)?.abbrFr) },
-        isActive = { it == vc },
-        onClick = { setVc(it) },
+        "${t.cuttingSpeed} (${vcUnit(app.units)})",
+        vcChipValues(app.carbide, app.imperial).map { v ->
+            Chip(formatVc(v, app.units, app.lang), vcMaterial(v, app.carbide)?.let { materialAbbr(it, app.lang) },
+                v == app.vc) { app.chooseVc(v) }
+        },
     )
 
-    // Frise diamètre + saisie
-    ChipStrip(
-        label = "Ø de perçage (mm)",
-        values = (1..20).map { it.toDouble() to null },
-        isActive = { kotlin.math.abs(diameterMm - it) < 0.01 },
-        onClick = { diameterMm = it },
-    )
+    // Frise Ø
+    val diaChips = if (app.imperial) {
+        IMPERIAL_DRILLS.map { d -> Chip(d.label, null, abs(app.diameterMm - d.mm) < 0.01) { app.chooseDiameter(d.mm) } }
+    } else {
+        (1..20).map { i -> Chip(i.toString(), null, abs(app.diameterMm - i) < 0.01) { app.chooseDiameter(i.toDouble()) } }
+    }
+    ChipStrip("${t.diameter} (${lenUnit(app.units)})", diaChips)
+
+    // Ø exact
+    val diaDisplay = displayLen(app.diameterMm, app.units)
+    var diaText by remember(diaDisplay) { mutableStateOf(fmtNum(diaDisplay)) }
     OutlinedTextField(
-        value = fmtNum(diameterMm),
-        onValueChange = { s -> s.replace(",", ".").toDoubleOrNull()?.let { if (it > 0) diameterMm = it } },
-        label = { Text("Ø exact (mm)") },
-        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Decimal),
-        modifier = Modifier.width(180.dp),
+        value = diaText,
+        onValueChange = { s -> diaText = s; s.replace(",", ".").toDoubleOrNull()?.let { app.chooseDiameter(parseLen(it, app.units)) } },
+        label = { Text("${t.exactDiameter} (${lenUnit(app.units)})") },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        singleLine = true, modifier = Modifier.width(200.dp),
     )
 
     reco?.let { r ->
         Text(
-            "Vitesse de coupe : ${fmtNum(vc)} m/min — Vitesse idéale : ${r.ideal.roundToInt()} tr/min",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MUTED,
+            "${t.cuttingSpeed} : ${formatVc(app.vc, app.units, app.lang)} ${vcUnit(app.units)} — " +
+                "${t.idealSpeed} : ${r.ideal.roundToInt()} ${rpmUnit(app.lang)}",
+            style = MaterialTheme.typography.bodyMedium, color = MUTED,
         )
     }
 
-    // ---- Recommandation ----
     if (reco != null && displayed != null) {
         if (reco.overspeed) {
-            Text(
-                "Même la combinaison la plus lente dépasse la vitesse idéale : réduisez " +
-                    "la vitesse d'avance et lubrifiez.",
-                color = ACCENT, fontWeight = FontWeight.SemiBold,
-            )
+            Text(t.overspeed, color = ACCENT, fontWeight = FontWeight.SemiBold)
         }
         Card(colors = CardDefaults.cardColors(containerColor = ACCENT_SOFT.copy(alpha = 0.4f))) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Position recommandée", style = MaterialTheme.typography.titleSmall)
+                Text(t.recommendedPosition, style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "${positionLabel(machine, displayed)} — ${displayed.spindleRpm.roundToInt()} tr/min " +
+                    "${positionLabel(machine, displayed)} — ${displayed.spindleRpm.roundToInt()} ${rpmUnit(app.lang)} " +
                         formatDeviation(displayed.spindleRpm, reco.ideal),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = ACCENT, fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.titleMedium, color = ACCENT, fontWeight = FontWeight.Bold,
                 )
-                PulleySchematic(machine, displayed.pairs, displayed.pairIndexes, modifier = Modifier.fillMaxWidth())
+                PulleySchematic(
+                    machine, displayed.pairs, displayed.pairIndexes, modifier = Modifier.fillMaxWidth(),
+                    formatLen = { formatLen(it, app.units, app.lang) }, rpmUnit = rpmUnit(app.lang),
+                )
             }
         }
 
-        // ---- Table des vitesses ----
-        Text("Toutes les vitesses", style = MaterialTheme.typography.titleMedium)
+        Text(t.allSpeeds, style = MaterialTheme.typography.titleMedium)
         val recommendedKey = comboKey(reco.best.pairs)
         val selKey = comboKey(displayed.pairs)
         Column(Modifier.fillMaxWidth()) {
             reco.all.forEachIndexed { idx, combo ->
                 val key = comboKey(combo.pairs)
-                SpeedRow(
-                    machine = machine,
-                    combo = combo,
-                    ideal = reco.ideal,
-                    range = ranges?.getOrNull(idx),
-                    recommended = key == recommendedKey,
-                    selected = key == selKey,
-                    onClick = { selectedKey = key },
-                )
+                SpeedRow(app, machine, combo, reco.ideal, ranges?.getOrNull(idx),
+                    key == recommendedKey, key == selKey) { app.selectedKey = key }
             }
         }
     }
@@ -227,52 +193,31 @@ private fun positionLabel(m: Machine, combo: Combination): String {
 
 @Composable
 private fun SegToggle(options: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit) {
-    Row(
-        Modifier
-            .border(1.dp, BORDER, RoundedCornerShape(50))
-            .padding(2.dp),
-    ) {
+    Row(Modifier.border(1.dp, BORDER, RoundedCornerShape(50)).padding(2.dp)) {
         options.forEachIndexed { i, opt ->
             val active = i == selectedIndex
             Box(
-                Modifier
-                    .background(if (active) ACCENT else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(50))
-                    .clickable { onSelect(i) }
-                    .padding(horizontal = 18.dp, vertical = 8.dp),
-            ) {
-                Text(opt, color = if (active) androidx.compose.ui.graphics.Color.White else MUTED, fontWeight = FontWeight.SemiBold)
-            }
+                Modifier.background(if (active) ACCENT else Color.Transparent, RoundedCornerShape(50))
+                    .clickable { onSelect(i) }.padding(horizontal = 18.dp, vertical = 8.dp),
+            ) { Text(opt, color = if (active) Color.White else MUTED, fontWeight = FontWeight.SemiBold) }
         }
     }
 }
 
 @Composable
-private fun ChipStrip(
-    label: String,
-    values: List<Pair<Double, String?>>,
-    isActive: (Double) -> Boolean,
-    onClick: (Double) -> Unit,
-) {
+private fun ChipStrip(label: String, chips: List<Chip>) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(label, fontWeight = FontWeight.SemiBold)
-        Row(
-            Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            values.forEach { (v, sub) ->
-                val active = isActive(v)
+        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            chips.forEach { c ->
                 Column(
-                    Modifier
-                        .background(if (active) ACCENT else androidx.compose.ui.graphics.Color.Transparent, RoundedCornerShape(6.dp))
-                        .border(1.dp, if (active) ACCENT else BORDER, RoundedCornerShape(6.dp))
-                        .clickable { onClick(v) }
-                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    Modifier.background(if (c.active) ACCENT else Color.Transparent, RoundedCornerShape(6.dp))
+                        .border(1.dp, if (c.active) ACCENT else BORDER, RoundedCornerShape(6.dp))
+                        .clickable { c.onClick() }.padding(horizontal = 10.dp, vertical = 6.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(fmtNum(v), color = if (active) androidx.compose.ui.graphics.Color.White else MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
-                    if (sub != null) {
-                        Text(sub, fontSize = 10.sp, color = if (active) androidx.compose.ui.graphics.Color.White else MUTED)
-                    }
+                    Text(c.label, color = if (c.active) Color.White else MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.SemiBold)
+                    if (c.sub != null) Text(c.sub, fontSize = 10.sp, color = if (c.active) Color.White else MUTED)
                 }
             }
         }
@@ -281,23 +226,15 @@ private fun ChipStrip(
 
 @Composable
 private fun SpeedRow(
-    machine: Machine,
-    combo: Combination,
-    ideal: Double,
-    range: DiameterRange?,
-    recommended: Boolean,
-    selected: Boolean,
-    onClick: () -> Unit,
+    app: AppState, machine: Machine, combo: Combination, ideal: Double, range: DiameterRange?,
+    recommended: Boolean, selected: Boolean, onClick: () -> Unit,
 ) {
     Row(
-        Modifier
-            .fillMaxWidth()
+        Modifier.fillMaxWidth()
             .then(if (recommended) Modifier.background(ACCENT_SOFT) else Modifier)
             .then(if (selected && !recommended) Modifier.border(2.dp, ACCENT) else Modifier)
-            .clickable { onClick() }
-            .padding(horizontal = 8.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+            .clickable { onClick() }.padding(horizontal = 8.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Box(Modifier.width(110.dp)) {
             PulleySchematic(machine, combo.pairs, combo.pairIndexes, mini = true, modifier = Modifier.fillMaxWidth())
@@ -305,21 +242,18 @@ private fun SpeedRow(
         Text("${combo.spindleRpm.roundToInt()}", fontWeight = FontWeight.Bold, modifier = Modifier.width(56.dp), textAlign = TextAlign.End)
         Text(formatDeviation(combo.spindleRpm, ideal), color = MUTED, fontSize = 13.sp, modifier = Modifier.width(52.dp), textAlign = TextAlign.End)
         Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-            Text(rangeLabel(range), color = MUTED, fontSize = 13.sp)
-            if (recommended) Badge("recommandé", ACCENT, androidx.compose.ui.graphics.Color.White)
-            else if (selected) Badge("affiché", androidx.compose.ui.graphics.Color.Transparent, ACCENT, ACCENT)
+            Text(rangeLabel(range, app.units, app.lang, app.t.allDiameters), color = MUTED, fontSize = 13.sp)
+            if (recommended) Badge(app.t.recommendedBadge, ACCENT, Color.White)
+            else if (selected) Badge(app.t.selectedBadge, Color.Transparent, ACCENT, ACCENT)
         }
     }
 }
 
 @Composable
-private fun Badge(text: String, bg: androidx.compose.ui.graphics.Color, fg: androidx.compose.ui.graphics.Color, borderColor: androidx.compose.ui.graphics.Color? = null) {
+private fun Badge(text: String, bg: Color, fg: Color, borderColor: Color? = null) {
     Box(
-        Modifier
-            .background(bg, RoundedCornerShape(50))
+        Modifier.background(bg, RoundedCornerShape(50))
             .then(if (borderColor != null) Modifier.border(1.dp, borderColor, RoundedCornerShape(50)) else Modifier)
             .padding(horizontal = 8.dp, vertical = 2.dp),
-    ) {
-        Text(text, color = fg, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-    }
+    ) { Text(text, color = fg, fontSize = 11.sp, fontWeight = FontWeight.SemiBold) }
 }
