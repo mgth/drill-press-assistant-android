@@ -21,6 +21,15 @@ class AppState {
     val machines = mutableStateListOf<Machine>()
     var currentId by mutableStateOf("")
     var rev by mutableIntStateOf(0)
+
+    /**
+     * Révision structurelle : incrémentée quand la FORME de la machine change
+     * (étages, positions de courroie, cônes, bascules). L'onglet Machine
+     * reconstruit son sous-arbre via key(structRev) — déterministe, immune aux
+     * heuristiques de skipping de Compose face à notre modèle mutable. Les
+     * frappes clavier n'incrémentent que rev, pour garder la saisie fluide.
+     */
+    var structRev by mutableIntStateOf(0)
     var lang by mutableStateOf(Lang.FR)
     var units by mutableStateOf(Units.METRIC)
 
@@ -45,24 +54,29 @@ class AppState {
     }
 
     fun addTwoShaft() {
-        val m = createTwoShaftMachine(factoryLabels(lang)); machines.add(m); currentId = m.id; selectedKey = null
+        val m = createTwoShaftMachine(factoryLabels(lang)); machines.add(m); currentId = m.id
+        touchStructure()
     }
 
     fun addThreeShaft() {
-        val m = createThreeShaftMachine(factoryLabels(lang)); machines.add(m); currentId = m.id; selectedKey = null
+        val m = createThreeShaftMachine(factoryLabels(lang)); machines.add(m); currentId = m.id
+        touchStructure()
     }
 
     fun removeMachine(id: String) {
         if (machines.size <= 1) return
         machines.removeAll { it.id == id }
         if (machines.none { it.id == currentId }) currentId = machines.first().id
-        selectedKey = null
+        touchStructure()
     }
 
-    fun selectMachine(id: String) { currentId = id; selectedKey = null }
+    fun selectMachine(id: String) { currentId = id; touchStructure() }
 
     /** Signale une édition en place de la machine (recomposition + reset sélection). */
     fun touch() { rev++; selectedKey = null }
+
+    /** Signale un changement de structure (reconstruction de l'onglet Machine). */
+    fun touchStructure() { structRev++; touch() }
 
     fun chooseMaterial(id: String) { materialId = id; vcOverride = null; selectedKey = null }
     fun chooseCarbide(c: Boolean) { carbide = c; vcOverride = null; selectedKey = null }

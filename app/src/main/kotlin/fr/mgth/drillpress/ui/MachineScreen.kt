@@ -56,24 +56,26 @@ private val FIELD_HEIGHT = 56.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MachineScreen(app: AppState) {
-    // Machine est une classe mutable : `rev` (état Compose) est la seule source
-    // d'invalidation. On le lit ici et on le PASSE aux cartes enfants — sous le
-    // strong skipping de Compose, des paramètres aux instances identiques
-    // seraient sautés même si leurs entrailles ont changé.
+    // Machine est une classe mutable : rev/structRev (états Compose) sont les
+    // seules sources d'invalidation. Tout le sous-arbre est reconstruit via
+    // key(structRev) à chaque changement de structure — déterministe face au
+    // skipping de Compose ; les frappes clavier n'incrémentent que rev.
     val rev = app.rev
+    val structRev = app.structRev
     val machine = app.machine
     val t = app.t
     ensurePairNames(machine)
     val issues = validateMachine(machine)
 
-    MachinePicker(app, rev)
+    key(structRev) {
+        MachinePicker(app, rev)
 
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             LocalTextField(machine.name, t.name, machine.id, Modifier.fillMaxWidth()) { machine.name = it; app.touch() }
             LocalNumberField(machine.motorRpm, t.motorRpm, machine.id, Modifier.width(220.dp)) { machine.motorRpm = it; app.touch() }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Switch(checked = machine.spindleLeft, onCheckedChange = { machine.spindleLeft = it; app.touch() })
+                Switch(checked = machine.spindleLeft, onCheckedChange = { machine.spindleLeft = it; app.touchStructure() })
                 Text(t.spindleLeft, style = MaterialTheme.typography.bodyMedium)
             }
         }
@@ -97,6 +99,7 @@ fun MachineScreen(app: AppState) {
     order.forEach { s -> ShaftCard(app, s, rev) }
 
     machine.belts.forEachIndexed { k, belt -> BeltEditor(app, belt, k, rev) }
+    } // key(structRev)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -154,7 +157,7 @@ private fun ShaftCard(app: AppState, s: Int, rev: Int) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Switch(
                         checked = shared,
-                        onCheckedChange = { setSharedIntermediate(machine, s, it); app.touch() },
+                        onCheckedChange = { setSharedIntermediate(machine, s, it); app.touchStructure() },
                     )
                     Text(app.t.sharedCone, style = MaterialTheme.typography.bodySmall)
                 }
@@ -183,14 +186,14 @@ private fun StackEditor(app: AppState, stack: PulleyStack, rev: Int) {
                         stack.steps[i] = parseLen(it, app.units); app.touch()
                     }
                     TextButton(
-                        onClick = { stack.steps.removeAt(i); syncBeltPairs(app.machine); app.touch() },
+                        onClick = { stack.steps.removeAt(i); syncBeltPairs(app.machine); app.touchStructure() },
                         enabled = steps.size > 1,
                     ) { Text("✕") }
                 }
             }
         }
         TextButton(onClick = {
-            stack.steps.add(stack.steps.lastOrNull() ?: 60.0); syncBeltPairs(app.machine); app.touch()
+            stack.steps.add(stack.steps.lastOrNull() ?: 60.0); syncBeltPairs(app.machine); app.touchStructure()
         }) { Text(t.addStep) }
     }
 }
@@ -218,14 +221,14 @@ private fun BeltEditor(app: AppState, belt: Belt, k: Int, rev: Int) {
                             belt.pairNames?.set(i, it); app.touch()
                         }
                         StepDropdown(app, fromStack, pair.first, rev, Modifier.weight(1f)) {
-                            belt.allowedPairs[i] = it to pair.second; app.touch()
+                            belt.allowedPairs[i] = it to pair.second; app.touchStructure()
                         }
                         Text("→")
                         StepDropdown(app, toStack, pair.second, rev, Modifier.weight(1f)) {
-                            belt.allowedPairs[i] = pair.first to it; app.touch()
+                            belt.allowedPairs[i] = pair.first to it; app.touchStructure()
                         }
                         TextButton(
-                            onClick = { belt.allowedPairs.removeAt(i); belt.pairNames?.removeAt(i); app.touch() },
+                            onClick = { belt.allowedPairs.removeAt(i); belt.pairNames?.removeAt(i); app.touchStructure() },
                             enabled = pairs.size > 1,
                         ) { Text("✕") }
                     }
@@ -235,13 +238,13 @@ private fun BeltEditor(app: AppState, belt: Belt, k: Int, rev: Int) {
                 TextButton(onClick = {
                     belt.allowedPairs.add(0 to 0)
                     belt.pairNames?.add(defaultPairNames(k, belt.allowedPairs.size).last())
-                    app.touch()
+                    app.touchStructure()
                 }) { Text(t.addPair) }
                 if (fromStack.steps.size == toStack.steps.size) {
                     TextButton(onClick = {
                         belt.allowedPairs = defaultPairs(fromStack, toStack)
                         belt.pairNames = defaultPairNames(k, belt.allowedPairs.size)
-                        app.touch()
+                        app.touchStructure()
                     }) { Text(t.resetPairs) }
                 }
             }
