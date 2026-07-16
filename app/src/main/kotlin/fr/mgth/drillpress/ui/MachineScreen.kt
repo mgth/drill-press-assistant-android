@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -35,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.mgth.drillpress.core.Belt
@@ -190,7 +192,7 @@ private fun BeltEditor(app: AppState, belt: Belt, k: Int) {
             belt.allowedPairs.forEachIndexed { i, pair ->
                 key(k, i) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        LocalTextField(belt.pairNames?.getOrNull(i) ?: "${i + 1}", t.pairRep, Unit, Modifier.width(64.dp)) {
+                        RepField(belt.pairNames?.getOrNull(i) ?: "${i + 1}", machine.id, Modifier.width(56.dp)) {
                             belt.pairNames?.set(i, it); app.touch()
                         }
                         StepDropdown(app, fromStack, pair.first, Modifier.weight(1f)) {
@@ -222,6 +224,34 @@ private fun BeltEditor(app: AppState, belt: Belt, k: Int) {
                 }
             }
         }
+    }
+}
+
+/**
+ * Champ repère compact : même cadre à hauteur fixe que les ancres de
+ * dropdown (pas d'étiquette flottante, elle décalerait la boîte).
+ */
+@Composable
+private fun RepField(value: String, resetKey: Any?, modifier: Modifier, onValue: (String) -> Unit) {
+    var text by remember(resetKey) { mutableStateOf(value) }
+    Box(
+        modifier
+            .height(FIELD_HEIGHT)
+            .border(1.dp, Color(0xFF79747E), RoundedCornerShape(4.dp))
+            .padding(horizontal = 6.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        BasicTextField(
+            value = text,
+            onValueChange = { text = it; onValue(it) },
+            singleLine = true,
+            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        )
     }
 }
 
