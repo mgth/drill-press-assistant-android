@@ -56,13 +56,17 @@ private val FIELD_HEIGHT = 56.dp
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MachineScreen(app: AppState) {
-    @Suppress("UNUSED_EXPRESSION") app.rev // relire pour recomposer à chaque édition
+    // Machine est une classe mutable : `rev` (état Compose) est la seule source
+    // d'invalidation. On le lit ici et on le PASSE aux cartes enfants — sous le
+    // strong skipping de Compose, des paramètres aux instances identiques
+    // seraient sautés même si leurs entrailles ont changé.
+    val rev = app.rev
     val machine = app.machine
     val t = app.t
     ensurePairNames(machine)
     val issues = validateMachine(machine)
 
-    MachinePicker(app)
+    MachinePicker(app, rev)
 
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -90,32 +94,36 @@ fun MachineScreen(app: AppState) {
     }
 
     val order = if (machine.spindleLeft) machine.shafts.indices.reversed().toList() else machine.shafts.indices.toList()
-    order.forEach { s -> ShaftCard(app, s) }
+    order.forEach { s -> ShaftCard(app, s, rev) }
 
-    machine.belts.forEachIndexed { k, belt -> BeltEditor(app, belt, k) }
+    machine.belts.forEachIndexed { k, belt -> BeltEditor(app, belt, k, rev) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MachinePicker(app: AppState) {
+private fun MachinePicker(app: AppState, rev: Int) {
     val t = app.t
     var confirmDelete by remember { mutableStateOf(false) }
+    // Instantanés frais : leurs captures changent à chaque révision → les
+    // lambdas de contenu sont invalidées malgré le strong skipping.
+    val currentName = app.machine.name
+    val entries = app.machines.map { it.id to it.name }
 
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         var expanded by remember { mutableStateOf(false) }
         ExposedDropdownMenuBox(expanded, { expanded = it }, Modifier.weight(1f)) {
             OutlinedTextField(
-                value = app.machine.name, onValueChange = {}, readOnly = true, label = { Text(t.pickerMachine) },
+                value = currentName, onValueChange = {}, readOnly = true, label = { Text(t.pickerMachine) },
                 trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
                 modifier = Modifier.menuAnchor().fillMaxWidth(),
             )
             ExposedDropdownMenu(expanded, { expanded = false }) {
-                app.machines.forEach { m ->
-                    DropdownMenuItem(text = { Text(m.name) }, onClick = { app.selectMachine(m.id); expanded = false })
+                entries.forEach { (id, name) ->
+                    DropdownMenuItem(text = { Text(name) }, onClick = { app.selectMachine(id); expanded = false })
                 }
             }
         }
-        if (app.machines.size > 1) TextButton(onClick = { confirmDelete = true }) { Text(t.deleteMachine) }
+        if (entries.size > 1) TextButton(onClick = { confirmDelete = true }) { Text(t.deleteMachine) }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         TextButton(onClick = { app.addTwoShaft() }) { Text(t.newTwoShaft) }
@@ -133,41 +141,50 @@ private fun MachinePicker(app: AppState) {
 }
 
 @Composable
-private fun ShaftCard(app: AppState, s: Int) {
+private fun ShaftCard(app: AppState, s: Int, rev: Int) {
     val machine = app.machine
     val shaft = machine.shafts[s]
+    // Instantanés frais (cf. MachineScreen) : invalident les lambdas de contenu.
+    val shared = isSharedIntermediate(machine, s)
+    val stacks = shaft.stacks.toList()
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(shaft.label, fontWeight = FontWeight.SemiBold)
             if (s in 1 until machine.shafts.size - 1) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Switch(
-                        checked = isSharedIntermediate(machine, s),
+                        checked = shared,
                         onCheckedChange = { setSharedIntermediate(machine, s, it); app.touch() },
                     )
                     Text(app.t.sharedCone, style = MaterialTheme.typography.bodySmall)
                 }
             }
-            shaft.stacks.forEach { stack -> StackEditor(app, stack) }
+            stacks.forEach { stack -> StackEditor(app, stack, rev) }
         }
     }
 }
 
 @Composable
-private fun StackEditor(app: AppState, stack: PulleyStack) {
+private fun StackEditor(app: AppState, stack: PulleyStack, rev: Int) {
     val t = app.t
+    val steps = stack.steps.toList()
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(stack.label, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
-        stack.steps.forEachIndexed { i, d ->
+        steps.forEachIndexed { i, d ->
             key(stack.id, i) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("${t.step} ${i + 1}", color = Color(0xFF6B6B6B), modifier = Modifier.width(40.dp))
-                    LocalNumberField(displayLen(d, app.units), "Ø ${lenUnit(app.units)}", app.units, Modifier.width(130.dp)) {
+                    // resetKey inclut le nombre d'étages : après une suppression,
+                    // les lignes se décalent et le texte local doit se recharger.
+                    LocalNumberField(
+                        displayLen(d, app.units), "Ø ${lenUnit(app.units)}",
+                        Triple(app.units, steps.size, i), Modifier.width(130.dp),
+                    ) {
                         stack.steps[i] = parseLen(it, app.units); app.touch()
                     }
                     TextButton(
                         onClick = { stack.steps.removeAt(i); syncBeltPairs(app.machine); app.touch() },
-                        enabled = stack.steps.size > 1,
+                        enabled = steps.size > 1,
                     ) { Text("✕") }
                 }
             }
@@ -180,31 +197,36 @@ private fun StackEditor(app: AppState, stack: PulleyStack) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun BeltEditor(app: AppState, belt: Belt, k: Int) {
+private fun BeltEditor(app: AppState, belt: Belt, k: Int, rev: Int) {
     val machine = app.machine
     val t = app.t
     val fromStack = machine.shafts[belt.fromShaft].stacks[belt.fromStack]
     val toStack = machine.shafts[belt.toShaft].stacks[belt.toStack]
+    // Instantanés frais (cf. MachineScreen).
+    val pairs = belt.allowedPairs.toList()
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("${t.belt} ${k + 1}", fontWeight = FontWeight.SemiBold)
             Text("${fromStack.label} → ${toStack.label}", color = Color(0xFF6B6B6B), style = MaterialTheme.typography.bodySmall)
-            belt.allowedPairs.forEachIndexed { i, pair ->
+            pairs.forEachIndexed { i, pair ->
                 key(k, i) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        RepField(belt.pairNames?.getOrNull(i) ?: "${i + 1}", machine.id, Modifier.width(56.dp)) {
+                        RepField(
+                            belt.pairNames?.getOrNull(i) ?: "${i + 1}",
+                            Triple(machine.id, pairs.size, i), Modifier.width(56.dp),
+                        ) {
                             belt.pairNames?.set(i, it); app.touch()
                         }
-                        StepDropdown(app, fromStack, pair.first, Modifier.weight(1f)) {
+                        StepDropdown(app, fromStack, pair.first, rev, Modifier.weight(1f)) {
                             belt.allowedPairs[i] = it to pair.second; app.touch()
                         }
                         Text("→")
-                        StepDropdown(app, toStack, pair.second, Modifier.weight(1f)) {
+                        StepDropdown(app, toStack, pair.second, rev, Modifier.weight(1f)) {
                             belt.allowedPairs[i] = pair.first to it; app.touch()
                         }
                         TextButton(
                             onClick = { belt.allowedPairs.removeAt(i); belt.pairNames?.removeAt(i); app.touch() },
-                            enabled = belt.allowedPairs.size > 1,
+                            enabled = pairs.size > 1,
                         ) { Text("✕") }
                     }
                 }
@@ -262,11 +284,17 @@ private fun RepField(value: String, resetKey: Any?, modifier: Modifier, onValue:
  * homogènes et tienne sur une ligne.
  */
 @Composable
-private fun StepDropdown(app: AppState, stack: PulleyStack, selected: Int, modifier: Modifier, onSelect: (Int) -> Unit) {
+private fun StepDropdown(app: AppState, stack: PulleyStack, selected: Int, rev: Int, modifier: Modifier, onSelect: (Int) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-    fun shortLabel(idx: Int) = "${idx + 1} · ${formatLen(stack.steps[idx], app.units, app.lang)}"
-    fun fullLabel(idx: Int) =
+    // Libellés instantanés (chaînes fraîches à chaque révision).
+    val shortLabels = stack.steps.indices.map { idx ->
+        "${idx + 1} · ${formatLen(stack.steps[idx], app.units, app.lang)}"
+    }
+    val fullLabels = stack.steps.indices.map { idx ->
         "${app.t.step} ${idx + 1} · ${formatLen(stack.steps[idx], app.units, app.lang)} ${lenUnit(app.units)}"
+    }
+    fun shortLabel(idx: Int) = shortLabels.getOrElse(idx) { "?" }
+    fun fullLabel(idx: Int) = fullLabels.getOrElse(idx) { "?" }
     Box(modifier) {
         Row(
             Modifier
