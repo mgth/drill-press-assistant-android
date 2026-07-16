@@ -1,14 +1,20 @@
 package fr.mgth.drillpress.ui
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -29,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import fr.mgth.drillpress.core.Belt
 import fr.mgth.drillpress.core.IssueLevel
@@ -40,6 +47,9 @@ import fr.mgth.drillpress.core.isSharedIntermediate
 import fr.mgth.drillpress.core.setSharedIntermediate
 import fr.mgth.drillpress.core.syncBeltPairs
 import fr.mgth.drillpress.core.validateMachine
+
+/** Hauteur des OutlinedTextField Material3 : alignée sur les ancres de dropdown. */
+private val FIELD_HEIGHT = 56.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -215,19 +225,40 @@ private fun BeltEditor(app: AppState, belt: Belt, k: Int) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Sélecteur d'étage compact : ancre à hauteur fixe (celle des champs de
+ * texte), libellé court sur une seule ligne (« 1 · 110 »), libellé complet
+ * dans le menu ouvert — pour que chaque ligne de position garde des cadres
+ * homogènes et tienne sur une ligne.
+ */
 @Composable
 private fun StepDropdown(app: AppState, stack: PulleyStack, selected: Int, modifier: Modifier, onSelect: (Int) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
-    fun label(idx: Int) = "${app.t.step} ${idx + 1} · ${formatLen(stack.steps[idx], app.units, app.lang)} ${lenUnit(app.units)}"
-    ExposedDropdownMenuBox(expanded, { expanded = it }, modifier) {
-        OutlinedTextField(
-            value = label(selected), onValueChange = {}, readOnly = true,
-            modifier = Modifier.menuAnchor().fillMaxWidth(),
-        )
-        ExposedDropdownMenu(expanded, { expanded = false }) {
+    fun shortLabel(idx: Int) = "${idx + 1} · ${formatLen(stack.steps[idx], app.units, app.lang)}"
+    fun fullLabel(idx: Int) =
+        "${app.t.step} ${idx + 1} · ${formatLen(stack.steps[idx], app.units, app.lang)} ${lenUnit(app.units)}"
+    Box(modifier) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(FIELD_HEIGHT)
+                .border(1.dp, Color(0xFF79747E), RoundedCornerShape(4.dp))
+                .clickable { expanded = true }
+                .padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                shortLabel(selected),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.weight(1f),
+            )
+            Text("▾", color = Color(0xFF6B6B6B))
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             stack.steps.indices.forEach { idx ->
-                DropdownMenuItem(text = { Text(label(idx)) }, onClick = { onSelect(idx); expanded = false })
+                DropdownMenuItem(text = { Text(fullLabel(idx)) }, onClick = { onSelect(idx); expanded = false })
             }
         }
     }
