@@ -1,0 +1,13 @@
+Calculates the spindle speeds of a belt-driven drill press and recommends the optimal belt position for a given drill diameter and material.
+
+Describe your machine once — motor speed, pulley stacks, belts — and the app computes every achievable spindle speed, draws the transmission diagram, and tells you which belt position to use for the hole you are about to drill.
+
+Features:
+
+* Interactive transmission diagram showing the current belt path
+* Speed advisor: enter a drill diameter and a material, get the best belt position
+* Complete speed table for all belt combinations
+* Machine editor with support for multiple machines (create, switch, delete)
+* Metric and imperial units
+* Interface in English and French
+* Fully offline, no permissions, no tracking

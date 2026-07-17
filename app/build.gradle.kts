@@ -32,6 +32,12 @@ android {
             isMinifyEnabled = false
         }
     }
+
+    dependenciesInfo {
+        // Blob chiffré destiné à Google Play, signalé par le scanner F-Droid
+        includeInApk = false
+        includeInBundle = false
+    }
 }
 
 kotlin {

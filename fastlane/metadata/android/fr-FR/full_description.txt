@@ -1,0 +1,13 @@
+Calcule les vitesses de broche d'une perceuse à colonne à transmission par courroies et recommande la position optimale des courroies pour un diamètre de perçage et un matériau donnés.
+
+Décrivez votre machine une fois — vitesse moteur, cônes de poulies, courroies — et l'application calcule toutes les vitesses de broche possibles, dessine le schéma de transmission et vous indique quelle position de courroie utiliser pour le trou à percer.
+
+Fonctionnalités :
+
+* Schéma de transmission interactif montrant le trajet actuel des courroies
+* Conseiller de vitesse : entrez un diamètre de foret et un matériau, obtenez la meilleure position de courroie
+* Table complète des vitesses pour toutes les combinaisons de courroies
+* Éditeur de machine avec prise en charge de plusieurs machines (créer, choisir, supprimer)
+* Unités métriques et impériales
+* Interface en français et en anglais
+* Entièrement hors ligne, aucune permission, aucun pistage
