@@ -23,7 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
-enum class AppTab { MACHINE, DRILLING }
+enum class AppTab { MACHINE, DRILLING, ABOUT }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,6 +57,7 @@ fun App() {
                 TabRow(selectedTabIndex = tab.ordinal) {
                     Tab(tab == AppTab.MACHINE, { tab = AppTab.MACHINE }, text = { Text(t.tabMachine) })
                     Tab(tab == AppTab.DRILLING, { tab = AppTab.DRILLING }, text = { Text(t.tabDrilling) })
+                    Tab(tab == AppTab.ABOUT, { tab = AppTab.ABOUT }, text = { Text(t.tabAbout) })
                 }
             }
         },
@@ -68,6 +69,7 @@ fun App() {
             when (tab) {
                 AppTab.MACHINE -> MachineScreen(app)
                 AppTab.DRILLING -> DrillingScreen(app)
+                AppTab.ABOUT -> AboutScreen(app)
             }
         }
     }

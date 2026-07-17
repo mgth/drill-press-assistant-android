@@ -17,6 +17,7 @@ enum class Units(val code: String) { METRIC("mm"), IMPERIAL("in") }
 class Strings(
     val tabMachine: String,
     val tabDrilling: String,
+    val tabAbout: String,
     // Picker
     val pickerMachine: String,
     val newTwoShaft: String,
@@ -52,13 +53,19 @@ class Strings(
     val allDiameters: String,
     val recommendedBadge: String,
     val selectedBadge: String,
+    // About
+    val aboutDescription: String,
+    val aboutVersion: String,
+    val aboutSource: String,
+    val aboutIssues: String,
+    val aboutLicense: String,
     private val issues: Map<IssueCode, (Map<String, Any>) -> String>,
 ) {
     fun issue(i: Issue): String = issues.getValue(i.code)(i.params)
 }
 
 val FR = Strings(
-    tabMachine = "Machine", tabDrilling = "Perçage",
+    tabMachine = "Machine", tabDrilling = "Perçage", tabAbout = "À propos",
     pickerMachine = "Machine", newTwoShaft = "Nouvelle (2 arbres)", newThreeShaft = "Nouvelle (3 arbres)",
     deleteMachine = "Supprimer", deleteConfirm = "Supprimer cette machine ?",
     name = "Nom", motorRpm = "Vitesse moteur (tr/min)",
@@ -74,6 +81,9 @@ val FR = Strings(
     overspeed = "Même la combinaison la plus lente dépasse la vitesse idéale : réduisez la vitesse d'avance et lubrifiez.",
     allSpeeds = "Toutes les vitesses", allDiameters = "tous",
     recommendedBadge = "recommandé", selectedBadge = "affiché",
+    aboutDescription = "Calcule les vitesses de broche d'une perceuse à colonne à transmission par courroies et recommande la position optimale des courroies pour un diamètre de perçage et un matériau donnés.",
+    aboutVersion = "Version", aboutSource = "Code source (GitHub)",
+    aboutIssues = "Signaler un problème", aboutLicense = "Licence GPL-3.0",
     issues = mapOf(
         IssueCode.MOTOR_RPM to { "La vitesse moteur doit être supérieure à 0." },
         IssueCode.MIN_SHAFTS to { "Il faut au moins deux arbres (moteur et broche)." },
@@ -90,7 +100,7 @@ val FR = Strings(
 )
 
 val EN = Strings(
-    tabMachine = "Machine", tabDrilling = "Drilling",
+    tabMachine = "Machine", tabDrilling = "Drilling", tabAbout = "About",
     pickerMachine = "Machine", newTwoShaft = "New (2 shafts)", newThreeShaft = "New (3 shafts)",
     deleteMachine = "Delete", deleteConfirm = "Delete this machine?",
     name = "Name", motorRpm = "Motor speed (rpm)",
@@ -106,6 +116,9 @@ val EN = Strings(
     overspeed = "Even the slowest combination exceeds the ideal speed: reduce the feed rate and lubricate.",
     allSpeeds = "All speeds", allDiameters = "all",
     recommendedBadge = "recommended", selectedBadge = "shown",
+    aboutDescription = "Calculates the spindle speeds of a belt-driven drill press and recommends the optimal belt position for a given drill diameter and material.",
+    aboutVersion = "Version", aboutSource = "Source code (GitHub)",
+    aboutIssues = "Report an issue", aboutLicense = "GPL-3.0 license",
     issues = mapOf(
         IssueCode.MOTOR_RPM to { "Motor speed must be greater than 0." },
         IssueCode.MIN_SHAFTS to { "At least two shafts are required (motor and spindle)." },
