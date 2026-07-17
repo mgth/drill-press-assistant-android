@@ -25,9 +25,9 @@
     <path android:pathData="M56.5,50 h19 v9 h-19 z" android:fillColor="#B0BEC5" />
     <path android:pathData="M53,60 h26 v9 h-26 z" android:fillColor="#CFD8DC" />
 
-    <!-- Courroie -->
+    <!-- Courroie : débord symétrique (4,5 px) au-delà des étages haut -->
     <path
-        android:pathData="M27,44.5 H81"
+        android:pathData="M27,44.5 H74"
         android:strokeColor="#F59E0B"
         android:strokeWidth="5"
         android:strokeLineCap="round" />
