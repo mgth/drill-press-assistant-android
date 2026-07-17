@@ -177,6 +177,7 @@ private fun ShaftCard(app: AppState, s: Int, rev: Int) {
 private fun StackEditor(app: AppState, stack: PulleyStack, rev: Int) {
     val t = app.t
     val steps = stack.steps.toList()
+    var confirmDelete by remember { mutableStateOf<Int?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(stack.label, fontWeight = FontWeight.Medium, style = MaterialTheme.typography.bodyMedium)
         steps.forEachIndexed { i, d ->
@@ -192,7 +193,7 @@ private fun StackEditor(app: AppState, stack: PulleyStack, rev: Int) {
                         stack.steps[i] = parseLen(it, app.units); app.touch()
                     }
                     TextButton(
-                        onClick = { stack.steps.removeAt(i); syncBeltPairs(app.machine); app.touchStructure() },
+                        onClick = { confirmDelete = i },
                         enabled = steps.size > 1,
                     ) { Text("✕") }
                 }
@@ -201,6 +202,20 @@ private fun StackEditor(app: AppState, stack: PulleyStack, rev: Int) {
         TextButton(onClick = {
             addStackStep(app.machine, stack); app.touchStructure()
         }) { Text(t.addStep) }
+    }
+
+    confirmDelete?.let { i ->
+        AlertDialog(
+            onDismissRequest = { confirmDelete = null },
+            confirmButton = {
+                TextButton(onClick = {
+                    stack.steps.removeAt(i); syncBeltPairs(app.machine); app.touchStructure()
+                    confirmDelete = null
+                }) { Text(t.delete) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text(t.cancel) } },
+            text = { Text(t.deleteStepConfirm) },
+        )
     }
 }
 
@@ -213,6 +228,7 @@ private fun BeltEditor(app: AppState, belt: Belt, k: Int, rev: Int) {
     val toStack = machine.shafts[belt.toShaft].stacks[belt.toStack]
     // Instantanés frais (cf. MachineScreen).
     val pairs = belt.allowedPairs.toList()
+    var confirmDelete by remember { mutableStateOf<Int?>(null) }
     Card {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("${t.belt} ${k + 1}", fontWeight = FontWeight.SemiBold)
@@ -239,7 +255,7 @@ private fun BeltEditor(app: AppState, belt: Belt, k: Int, rev: Int) {
                             belt.allowedPairs[i] = pair.first to it; app.touchStructure()
                         }
                         TextButton(
-                            onClick = { belt.allowedPairs.removeAt(i); belt.pairNames?.removeAt(i); app.touchStructure() },
+                            onClick = { confirmDelete = i },
                             enabled = pairs.size > 1,
                         ) { Text("✕") }
                     }
@@ -260,6 +276,20 @@ private fun BeltEditor(app: AppState, belt: Belt, k: Int, rev: Int) {
                 }
             }
         }
+    }
+
+    confirmDelete?.let { i ->
+        AlertDialog(
+            onDismissRequest = { confirmDelete = null },
+            confirmButton = {
+                TextButton(onClick = {
+                    belt.allowedPairs.removeAt(i); belt.pairNames?.removeAt(i); app.touchStructure()
+                    confirmDelete = null
+                }) { Text(t.delete) }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = null }) { Text(t.cancel) } },
+            text = { Text(t.deletePairConfirm) },
+        )
     }
 }
 

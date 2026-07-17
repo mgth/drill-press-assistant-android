@@ -18,8 +18,17 @@ class MachineEditTest {
         assertTrue((5 to 5) in m.belts[0].allowedPairs)
         assertEquals(m.belts[0].allowedPairs.size, m.belts[0].pairNames!!.size)
         assertEquals("F", m.belts[0].pairNames!!.last())
-        // Le nouvel étage reprend le diamètre du dernier.
-        assertEquals(48.0, motor.steps.last(), 1e-9)
+        // Le nouvel étage prolonge la progression : 48 + moyenne des écarts (−13).
+        assertEquals(35.0, motor.steps.last(), 1e-9)
+    }
+
+    @Test
+    fun nextStepDiameterAveragesGapsRoundedToMm() {
+        assertEquals(90.4, nextStepDiameter(listOf(62.3, 76.4)), 1e-9) // écart 14,1 → 14
+        assertEquals(35.0, nextStepDiameter(listOf(100.0, 87.0, 74.0, 61.0, 48.0)), 1e-9)
+        assertEquals(60.0, nextStepDiameter(emptyList()), 1e-9)
+        assertEquals(80.0, nextStepDiameter(listOf(80.0)), 1e-9)
+        assertEquals(4.0, nextStepDiameter(listOf(10.0, 4.0)), 1e-9) // 4 − 6 ≤ 0 → inchangé
     }
 
     @Test

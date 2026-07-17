@@ -252,9 +252,22 @@ fun syncBeltPairs(m: Machine) {
  * d'en face possède déjà cet étage. Si le cône d'en face est plus court, la
  * position naîtra quand on lui ajoutera son propre étage.
  */
+/**
+ * Diamètre proposé pour un nouvel étage : dernier étage + moyenne des écarts
+ * existants arrondie au mm (le signe suit le sens du cône). Cône d'un seul
+ * étage : même diamètre ; cône vide : 60 mm.
+ */
+fun nextStepDiameter(steps: List<Double>): Double {
+    val last = steps.lastOrNull() ?: return 60.0
+    if (steps.size < 2) return last
+    val gap = Math.round(steps.zipWithNext { a, b -> b - a }.average()).toDouble()
+    val next = last + gap
+    return if (next > 0) next else last
+}
+
 fun addStackStep(m: Machine, stack: PulleyStack) {
     val i = stack.steps.size
-    stack.steps.add(stack.steps.lastOrNull() ?: 60.0)
+    stack.steps.add(nextStepDiameter(stack.steps))
     m.belts.forEachIndexed { k, belt ->
         val from = m.shafts.getOrNull(belt.fromShaft)?.stacks?.getOrNull(belt.fromStack) ?: return@forEachIndexed
         val to = m.shafts.getOrNull(belt.toShaft)?.stacks?.getOrNull(belt.toStack) ?: return@forEachIndexed
