@@ -246,6 +246,42 @@ fun syncBeltPairs(m: Machine) {
     }
 }
 
+/**
+ * Ajoute un étage à un cône (diamètre du dernier étage repris) et crée la
+ * position de courroie correspondante sur chaque courroie reliée dont le cône
+ * d'en face possède déjà cet étage. Si le cône d'en face est plus court, la
+ * position naîtra quand on lui ajoutera son propre étage.
+ */
+fun addStackStep(m: Machine, stack: PulleyStack) {
+    val i = stack.steps.size
+    stack.steps.add(stack.steps.lastOrNull() ?: 60.0)
+    m.belts.forEachIndexed { k, belt ->
+        val from = m.shafts.getOrNull(belt.fromShaft)?.stacks?.getOrNull(belt.fromStack) ?: return@forEachIndexed
+        val to = m.shafts.getOrNull(belt.toShaft)?.stacks?.getOrNull(belt.toStack) ?: return@forEachIndexed
+        val linked = (from === stack && to.steps.size > i) || (to === stack && from.steps.size > i)
+        if (!linked || (i to i) in belt.allowedPairs) return@forEachIndexed
+        belt.allowedPairs.add(i to i)
+        belt.pairNames?.let { it.add(nextPairName(k, it)) }
+    }
+}
+
+/**
+ * Prochain repère libre dans le style des repères existants de la courroie
+ * (lettres ou chiffres, y compris affichés en ordre inverse), sinon le repère
+ * par défaut de la convention chiffres/lettres.
+ */
+private fun nextPairName(beltIndex: Int, names: List<String>): String {
+    val trimmed = names.map { it.trim() }
+    return when {
+        trimmed.isNotEmpty() && trimmed.all { it.length == 1 && it[0] in 'A'..'Z' } ->
+            ('A'..'Z').firstOrNull { it.toString() !in trimmed }?.toString()
+                ?: defaultPairNames(beltIndex, names.size + 1).last()
+        trimmed.isNotEmpty() && trimmed.all { it.toIntOrNull() != null } ->
+            generateSequence(1) { it + 1 }.first { it.toString() !in trimmed }.toString()
+        else -> defaultPairNames(beltIndex, names.size + 1).last()
+    }
+}
+
 /** Gabarit : perceuse simple, 2 arbres, 5 vitesses. */
 fun createTwoShaftMachine(labels: FactoryLabels = DEFAULT_FACTORY_LABELS): Machine {
     val motor = PulleyStack(newId(), labels.motorCone, mutableListOf(100.0, 87.0, 74.0, 61.0, 48.0))

@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import fr.mgth.drillpress.core.Belt
 import fr.mgth.drillpress.core.IssueLevel
 import fr.mgth.drillpress.core.PulleyStack
+import fr.mgth.drillpress.core.addStackStep
 import fr.mgth.drillpress.core.defaultPairNames
 import fr.mgth.drillpress.core.defaultPairs
 import fr.mgth.drillpress.core.ensurePairNames
@@ -198,7 +199,7 @@ private fun StackEditor(app: AppState, stack: PulleyStack, rev: Int) {
             }
         }
         TextButton(onClick = {
-            stack.steps.add(stack.steps.lastOrNull() ?: 60.0); syncBeltPairs(app.machine); app.touchStructure()
+            addStackStep(app.machine, stack); app.touchStructure()
         }) { Text(t.addStep) }
     }
 }
