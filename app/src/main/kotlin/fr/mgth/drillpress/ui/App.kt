@@ -30,7 +30,7 @@ enum class AppTab { MACHINE, DRILLING, ABOUT }
 fun App() {
     val ctx = LocalContext.current
     val app = remember { AppState().also { loadState(ctx, it); it.ensureMachine() } }
-    var tab by remember { mutableStateOf(AppTab.MACHINE) }
+    var tab by remember { mutableStateOf(AppTab.DRILLING) }
     val t = app.t
 
     // Sauvegarde à chaque changement d'état persistant (édition, ajout/suppression
