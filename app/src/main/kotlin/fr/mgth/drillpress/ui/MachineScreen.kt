@@ -70,19 +70,24 @@ fun MachineScreen(app: AppState) {
     key(structRev) {
         MachinePicker(app, rev)
 
-    Card {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            LocalTextField(machine.name, t.name, machine.id, Modifier.fillMaxWidth()) { machine.name = it; app.touch() }
-            LocalNumberField(machine.motorRpm, t.motorRpm, machine.id, Modifier.width(220.dp)) { machine.motorRpm = it; app.touch() }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Switch(checked = machine.spindleLeft, onCheckedChange = { machine.spindleLeft = it; app.touchStructure() })
-                Text(t.spindleLeft, style = MaterialTheme.typography.bodyMedium)
+    // Carte machine et carte d'avertissements dans un même conteneur : la carte
+    // d'avertissements apparaît/disparaît en DERNIER enfant de ce sous-arbre,
+    // donc aucun nœud frère ne change d'index dans la Column défilante. Avant,
+    // son insertion décalait les cartes d'arbres et volait le focus du champ en
+    // cours de saisie (le clavier se fermait dès qu'un avertissement basculait).
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Card {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                LocalTextField(machine.name, t.name, machine.id, Modifier.fillMaxWidth()) { machine.name = it; app.touch() }
+                LocalNumberField(machine.motorRpm, t.motorRpm, machine.id, Modifier.width(220.dp)) { machine.motorRpm = it; app.touch() }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Switch(checked = machine.spindleLeft, onCheckedChange = { machine.spindleLeft = it; app.touchStructure() })
+                    Text(t.spindleLeft, style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
-    }
 
-    if (issues.isNotEmpty()) {
-        Card {
+        if (issues.isNotEmpty()) Card {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 issues.forEach {
                     Text(
