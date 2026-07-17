@@ -2,6 +2,7 @@ package fr.mgth.drillpress.ui
 
 import android.content.Context
 import fr.mgth.drillpress.core.Belt
+import fr.mgth.drillpress.core.BitType
 import fr.mgth.drillpress.core.Machine
 import fr.mgth.drillpress.core.PulleyStack
 import fr.mgth.drillpress.core.Shaft
@@ -86,7 +87,7 @@ fun saveState(context: Context, app: AppState) {
         put("currentId", app.currentId)
         put("advisor", JSONObject().apply {
             put("materialId", app.materialId)
-            put("carbide", app.carbide)
+            put("bitType", app.bitType.name)
             if (app.vcOverride != null) put("vcOverride", app.vcOverride)
             put("diameterMm", app.diameterMm)
         })
@@ -107,7 +108,9 @@ fun loadState(context: Context, app: AppState) {
         app.currentId = o.optString("currentId", app.machines.firstOrNull()?.id ?: "")
         o.optJSONObject("advisor")?.let { a ->
             app.materialId = a.optString("materialId", "steel")
-            app.carbide = a.optBoolean("carbide", false)
+            // Anciennes sauvegardes : booléen « carbide » au lieu du type de foret.
+            app.bitType = runCatching { BitType.valueOf(a.getString("bitType")) }
+                .getOrElse { if (a.optBoolean("carbide", false)) BitType.CARBIDE else BitType.HSS }
             app.vcOverride = if (a.has("vcOverride")) a.getDouble("vcOverride") else null
             app.diameterMm = a.optDouble("diameterMm", 8.0)
         }

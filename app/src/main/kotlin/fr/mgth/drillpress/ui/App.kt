@@ -37,7 +37,7 @@ fun App() {
     // ou changement de machine courante, réglages, langue, unités).
     LaunchedEffect(
         app.rev, app.machines.size, app.currentId,
-        app.materialId, app.carbide, app.vcOverride, app.diameterMm, app.lang, app.units,
+        app.materialId, app.bitType, app.vcOverride, app.diameterMm, app.lang, app.units,
     ) { saveState(ctx, app) }
 
     Scaffold(
@@ -49,7 +49,7 @@ fun App() {
                         TextButton(onClick = { app.units = if (app.imperial) Units.METRIC else Units.IMPERIAL }) {
                             Text(app.units.code)
                         }
-                        TextButton(onClick = { app.lang = if (app.lang == Lang.FR) Lang.EN else Lang.FR }) {
+                        TextButton(onClick = { app.switchLang(if (app.lang == Lang.FR) Lang.EN else Lang.FR) }) {
                             Text(app.lang.code)
                         }
                     },

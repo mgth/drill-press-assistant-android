@@ -142,7 +142,7 @@ private fun MachinePicker(app: AppState, rev: Int) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             confirmButton = { TextButton(onClick = { app.removeMachine(app.currentId); confirmDelete = false }) { Text(t.deleteMachine) } },
-            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("×") } },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(t.cancel) } },
             text = { Text(t.deleteConfirm) },
         )
     }
@@ -216,6 +216,11 @@ private fun BeltEditor(app: AppState, belt: Belt, k: Int, rev: Int) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("${t.belt} ${k + 1}", fontWeight = FontWeight.SemiBold)
             Text("${fromStack.label} → ${toStack.label}", color = Color(0xFF6B6B6B), style = MaterialTheme.typography.bodySmall)
+            // En-tête de la colonne des repères : signale que la case est éditable.
+            Text(
+                t.pairRep, color = Color(0xFF6B6B6B), style = MaterialTheme.typography.labelSmall,
+                textAlign = TextAlign.Center, modifier = Modifier.width(56.dp),
+            )
             pairs.forEachIndexed { i, pair ->
                 key(k, i) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {

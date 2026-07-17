@@ -5,11 +5,12 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import fr.mgth.drillpress.core.CARBIDE_FACTOR
+import fr.mgth.drillpress.core.BitType
 import fr.mgth.drillpress.core.Machine
 import fr.mgth.drillpress.core.createThreeShaftMachine
 import fr.mgth.drillpress.core.createTwoShaftMachine
 import fr.mgth.drillpress.core.materialById
+import fr.mgth.drillpress.core.materialVc
 import fr.mgth.drillpress.core.vcMaterial
 
 /**
@@ -34,7 +35,7 @@ class AppState {
     var units by mutableStateOf(Units.METRIC)
 
     var materialId by mutableStateOf("steel")
-    var carbide by mutableStateOf(false)
+    var bitType by mutableStateOf(BitType.HSS)
     var vcOverride by mutableStateOf<Double?>(null)
     var diameterMm by mutableStateOf(8.0)
     var selectedKey by mutableStateOf<String?>(null)
@@ -43,7 +44,7 @@ class AppState {
     val imperial: Boolean get() = units == Units.IMPERIAL
     val custom: Boolean get() = vcOverride != null
     val material get() = materialById(materialId) ?: materialById("steel")!!
-    val vc: Double get() = vcOverride ?: material.vcHss * (if (carbide) CARBIDE_FACTOR else 1.0)
+    val vc: Double get() = vcOverride ?: materialVc(material, bitType.factor)
 
     /** Machine courante (la liste est garantie non vide après [ensureMachine]). */
     val machine: Machine get() = machines.firstOrNull { it.id == currentId } ?: machines.first()
@@ -79,11 +80,40 @@ class AppState {
     fun touchStructure() { structRev++; touch() }
 
     fun chooseMaterial(id: String) { materialId = id; vcOverride = null; selectedKey = null }
-    fun chooseCarbide(c: Boolean) { carbide = c; vcOverride = null; selectedKey = null }
+    fun chooseBit(b: BitType) { bitType = b; vcOverride = null; selectedKey = null }
     fun chooseDiameter(mm: Double) { if (mm > 0) { diameterMm = mm; selectedKey = null } }
     fun chooseVc(v: Double) {
-        val m = vcMaterial(v, carbide)
+        val m = vcMaterial(v, bitType.factor)
         if (m != null) { materialId = m.id; vcOverride = null } else vcOverride = v
         selectedKey = null
+    }
+
+    /**
+     * Change la langue en traduisant au passage les libellés d'usine encore
+     * intacts (noms de machine, d'arbres et de cônes issus des gabarits) —
+     * les libellés personnalisés ne sont pas touchés.
+     */
+    fun switchLang(newLang: Lang) {
+        if (newLang == lang) return
+        val from = factoryLabels(lang)
+        val to = factoryLabels(newLang)
+        val map = mapOf(
+            from.twoShaftName to to.twoShaftName, from.threeShaftName to to.threeShaftName,
+            from.motorShaft to to.motorShaft, from.intermediateShaft to to.intermediateShaft,
+            from.spindleShaft to to.spindleShaft,
+            from.motorCone to to.motorCone, from.spindleCone to to.spindleCone,
+            from.intermediateCone to to.intermediateCone,
+            from.intermediateConeIn to to.intermediateConeIn,
+            from.intermediateConeOut to to.intermediateConeOut,
+        )
+        machines.forEach { m ->
+            m.name = map[m.name] ?: m.name
+            m.shafts.forEach { sh ->
+                sh.label = map[sh.label] ?: sh.label
+                sh.stacks.forEach { st -> st.label = map[st.label] ?: st.label }
+            }
+        }
+        lang = newLang
+        touchStructure()
     }
 }

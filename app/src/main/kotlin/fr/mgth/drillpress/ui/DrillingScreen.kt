@@ -30,12 +30,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fr.mgth.drillpress.core.BitType
 import fr.mgth.drillpress.core.Combination
 import fr.mgth.drillpress.core.DiameterRange
 import fr.mgth.drillpress.core.IMPERIAL_DRILLS
@@ -83,7 +85,7 @@ fun DrillingScreen(app: AppState) {
     val t = app.t
     val machine = app.machine
 
-    val reco = remember(app.materialId, app.carbide, app.vcOverride, app.diameterMm, app.rev) {
+    val reco = remember(app.materialId, app.bitType, app.vcOverride, app.diameterMm, app.rev) {
         if (app.diameterMm > 0 && app.vc > 0) recommend(machine, app.vc, app.diameterMm) else null
     }
     val ranges = remember(reco) { reco?.let { diameterRanges(it.all, app.vc) } }
@@ -91,10 +93,10 @@ fun DrillingScreen(app: AppState) {
 
     Text(t.drillingParams, style = MaterialTheme.typography.titleMedium)
 
-    // Matériau + type de foret
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.Bottom) {
+    // Matériau
+    Row {
         var expanded by remember { mutableStateOf(false) }
-        ExposedDropdownMenuBox(expanded, { expanded = it }, Modifier.weight(1f)) {
+        ExposedDropdownMenuBox(expanded, { expanded = it }, Modifier.fillMaxWidth()) {
             OutlinedTextField(
                 value = if (app.custom) t.custom else materialLabel(app.material, app.lang),
                 onValueChange = {}, readOnly = true, label = { Text(t.material) },
@@ -108,20 +110,29 @@ fun DrillingScreen(app: AppState) {
                 }
             }
         }
-        Column {
-            Text(t.bitType, fontWeight = FontWeight.SemiBold)
-            SegToggle(
-                listOf(t.hss, t.carbide),
-                if (app.custom) -1 else if (app.carbide) 1 else 0,
-            ) { app.chooseCarbide(it == 1) }
-        }
+    }
+
+    // Type de foret : le facteur HSS-Co / carbure n'a de sens que pour les
+    // métaux — sélecteur figé sur HSS pour bois et plastique.
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(t.bitType, fontWeight = FontWeight.SemiBold)
+        val metal = app.material.metal || app.custom
+        SegToggle(
+            listOf(t.hss, t.hssCo, t.carbide),
+            when {
+                app.custom -> -1
+                !metal -> 0
+                else -> app.bitType.ordinal
+            },
+            enabled = metal,
+        ) { app.chooseBit(BitType.entries[it]) }
     }
 
     // Frise Vc
     ChipStrip(
         "${t.cuttingSpeed} (${vcUnit(app.units)})",
-        vcChipValues(app.carbide, app.imperial).map { v ->
-            Chip(formatVc(v, app.units, app.lang), vcMaterial(v, app.carbide)?.let { materialAbbr(it, app.lang) },
+        vcChipValues(app.bitType.factor, app.imperial).map { v ->
+            Chip(formatVc(v, app.units, app.lang), vcMaterial(v, app.bitType.factor)?.let { materialAbbr(it, app.lang) },
                 v == app.vc) { app.chooseVc(v) }
         },
     )
@@ -176,9 +187,19 @@ fun DrillingScreen(app: AppState) {
         val recommendedKey = comboKey(reco.best.pairs)
         val selKey = comboKey(displayed.pairs)
         Column(Modifier.fillMaxWidth()) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(t.colPosition, color = MUTED, fontSize = 12.sp, modifier = Modifier.width(110.dp))
+                Text(rpmUnit(app.lang), color = MUTED, fontSize = 12.sp, modifier = Modifier.width(56.dp), textAlign = TextAlign.End)
+                Text(t.colDeviation, color = MUTED, fontSize = 12.sp, modifier = Modifier.width(52.dp), textAlign = TextAlign.End)
+                Text("${t.colRange} (${lenUnit(app.units)})", color = MUTED, fontSize = 12.sp,
+                    modifier = Modifier.weight(1f), textAlign = TextAlign.End)
+            }
             reco.all.forEachIndexed { idx, combo ->
                 val key = comboKey(combo.pairs)
-                SpeedRow(app, machine, combo, reco.ideal, ranges?.getOrNull(idx),
+                SpeedRow(app, machine, combo, reco.ideal, ranges?.getOrNull(idx), positionLabel(machine, combo),
                     key == recommendedKey, key == selKey) { app.selectedKey = key }
             }
         }
@@ -192,13 +213,13 @@ private fun positionLabel(m: Machine, combo: Combination): String {
 }
 
 @Composable
-private fun SegToggle(options: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit) {
-    Row(Modifier.border(1.dp, BORDER, RoundedCornerShape(50)).padding(2.dp)) {
+private fun SegToggle(options: List<String>, selectedIndex: Int, enabled: Boolean = true, onSelect: (Int) -> Unit) {
+    Row(Modifier.alpha(if (enabled) 1f else 0.45f).border(1.dp, BORDER, RoundedCornerShape(50)).padding(2.dp)) {
         options.forEachIndexed { i, opt ->
             val active = i == selectedIndex
             Box(
                 Modifier.background(if (active) ACCENT else Color.Transparent, RoundedCornerShape(50))
-                    .clickable { onSelect(i) }.padding(horizontal = 18.dp, vertical = 8.dp),
+                    .clickable(enabled = enabled) { onSelect(i) }.padding(horizontal = 14.dp, vertical = 8.dp),
             ) { Text(opt, color = if (active) Color.White else MUTED, fontWeight = FontWeight.SemiBold) }
         }
     }
@@ -227,7 +248,7 @@ private fun ChipStrip(label: String, chips: List<Chip>) {
 @Composable
 private fun SpeedRow(
     app: AppState, machine: Machine, combo: Combination, ideal: Double, range: DiameterRange?,
-    recommended: Boolean, selected: Boolean, onClick: () -> Unit,
+    label: String, recommended: Boolean, selected: Boolean, onClick: () -> Unit,
 ) {
     Row(
         Modifier.fillMaxWidth()
@@ -236,8 +257,9 @@ private fun SpeedRow(
             .clickable { onClick() }.padding(horizontal = 8.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Box(Modifier.width(110.dp)) {
+        Column(Modifier.width(110.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             PulleySchematic(machine, combo.pairs, combo.pairIndexes, mini = true, modifier = Modifier.fillMaxWidth())
+            Text(label, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = MUTED)
         }
         Text("${combo.spindleRpm.roundToInt()}", fontWeight = FontWeight.Bold, modifier = Modifier.width(56.dp), textAlign = TextAlign.End)
         Text(formatDeviation(combo.spindleRpm, ideal), color = MUTED, fontSize = 13.sp, modifier = Modifier.width(52.dp), textAlign = TextAlign.End)
